@@ -4,50 +4,61 @@ import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
-import javax.transaction.Transactional;
-
 import java.io.Serializable;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.List;
 
-@Transactional
-public class GenericDAO<T, I extends Serializable>  {
-
+public class GenericDAO<P, E extends Serializable> {
 
     @PersistenceContext(unitName = "PU")
-    EntityManager em;
+    private EntityManager em;
 
-    private Class<T> persistedClass;
+    private Class<E> clazz;
 
-    public GenericDAO(){
+    @SuppressWarnings("unchecked")
+    public GenericDAO() {
+        Type genericSuperClass = getClass().getGenericSuperclass();
+
+        ParameterizedType parametrizedType = null;
+
+        while (parametrizedType == null) {
+            if ((genericSuperClass instanceof ParameterizedType)) {
+                parametrizedType = (ParameterizedType) genericSuperClass;
+            } else {
+                genericSuperClass = ((Class<?>) genericSuperClass).getGenericSuperclass();
+            }
+        }
+
+        this.clazz = (Class<E>) parametrizedType.getActualTypeArguments()[1];
     }
 
-    public GenericDAO(Class<T> persistedClass){
-        this();
-        this.persistedClass = persistedClass;
-    }
-
-    public void salvar (T t){
-        em.persist(t);
-    }
-
-    public T buscarId(I id){
-        return em.find(persistedClass, id);
-    }
-
-    public List<T> buscarTodos(){
+    public List<E> list() {
         CriteriaBuilder builder = em.getCriteriaBuilder();
-        CriteriaQuery<T> query = builder.createQuery(persistedClass);
-        query.from(persistedClass);
-        return em.createQuery(query).getResultList();
+        CriteriaQuery<E> query = builder.createQuery(clazz);
+        query.from(clazz);
+        List<E> resultList = em.createQuery(query).getResultList();
+        return resultList;
     }
 
-    public T atualizar(T t){
-        return em.merge(t);
+    public E findById(P p) {
+        return em.find(clazz, p);
     }
 
-    public void deletar (I id){
-        T t = buscarId(id);
-        em.remove(t);
+    public void insert(E e) {
+        em.persist(e);
     }
+
+    public E update(E e) {
+        return em.merge(e);
+    }
+
+    public void remove(E e) {
+        em.remove(e);
+    }
+
+    public EntityManager getEntityManager() {
+        return em;
+    }
+
 }
-
